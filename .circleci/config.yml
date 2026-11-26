@@ -1,0 +1,39 @@
+version: 2.1
+# No orbs, no contexts, no secrets. Public images only.
+executors:
+  base:
+    docker: [{ image: cimg/base:current }]
+    resource_class: small
+jobs:
+  show-pipeline:
+    executor: base
+    steps:
+      - run: |
+          echo "branch=<< pipeline.git.branch >> rev=<< pipeline.git.revision >>"
+          echo "base_revision=<< pipeline.git.base_revision >>"
+          echo "trigger=<< pipeline.trigger.type >>"
+          echo "CIRCLE_PULL_REQUEST=${CIRCLE_PULL_REQUEST:-unset} CIRCLE_PR_NUMBER=${CIRCLE_PR_NUMBER:-unset}"
+          echo "CIRCLE_USERNAME=${CIRCLE_USERNAME:-unset} CIRCLE_SHA1=${CIRCLE_SHA1}"
+          re='^gh-readonly-queue/(.+)/pr-([0-9]+)(-[0-9a-f]+)?$'
+          [[ "${CIRCLE_BRANCH:-}" =~ $re ]] && echo "base=${BASH_REMATCH[1]} pr=${BASH_REMATCH[2]}" || true
+  build:      { executor: base, steps: [checkout, run: test ! -f poc/fail-build] }
+  unit-tests: { executor: base, steps: [checkout, run: test ! -f poc/fail-unit] }
+  prepare:    { executor: base, steps: [checkout, run: test ! -f poc/fail-prepare] }
+  run-e2e:    { executor: base, steps: [checkout, run: sleep 60, run: test ! -f poc/fail-e2e] }
+  skip:       { executor: base, steps: [run: circleci-agent step halt] }
+workflows:
+  pr:
+    when: not (pipeline.git.branch starts-with "gh-readonly-queue/")
+    jobs:
+      - show-pipeline
+      - build
+      - unit-tests: { requires: [build] }
+      - skip: { name: e2e }      # regular job, so the status is "ci/circleci: e2e"
+  merge-queue:
+    when: pipeline.git.branch starts-with "gh-readonly-queue/"
+    jobs:
+      - show-pipeline
+      - build
+      - unit-tests: { requires: [build] }
+      - prepare                  # not a required check
+      - run-e2e: { name: e2e, requires: [build, prepare] }

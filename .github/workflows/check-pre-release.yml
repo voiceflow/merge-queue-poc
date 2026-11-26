@@ -1,0 +1,9 @@
+name: check-pre-release
+# Runs on push only. There is no merge_group trigger on purpose.
+on:
+  push:
+jobs:
+  check-pre-release:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "synthetic check passes"
