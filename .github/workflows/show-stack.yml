@@ -1,0 +1,27 @@
+# Round 2, test T18. Prints what a workflow can see about stacks. Not a required check.
+name: show-stack
+on:
+  pull_request:
+  merge_group:
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  show-stack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: event name and ref
+        run: echo "event=${{ github.event_name }} ref=${{ github.ref }} sha=${{ github.sha }}"
+      - name: stack expression
+        env:
+          STACK: ${{ toJSON(github.event.pull_request.stack) }}
+        run: echo "$STACK"
+      - name: merge_group object
+        env:
+          MG: ${{ toJSON(github.event.merge_group) }}
+        run: echo "$MG"
+      - name: top-level keys and stack fields of the event payload
+        run: |
+          jq -r 'keys|join(" ")' "$GITHUB_EVENT_PATH"
+          jq '[paths|map(tostring)|join(".")]|map(select(test("stack";"i")))' "$GITHUB_EVENT_PATH"
+          jq '.pull_request|{number,base:.base.ref,head:.head.ref,stack}' "$GITHUB_EVENT_PATH"
