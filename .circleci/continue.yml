@@ -19,7 +19,13 @@ jobs:
   build:      { executor: base, steps: [checkout, run: test ! -f poc/fail-build] }
   unit-tests: { executor: base, steps: [checkout, run: test ! -f poc/fail-unit] }
   prepare:    { executor: base, steps: [checkout, run: test ! -f poc/fail-prepare] }
-  run-e2e:    { executor: base, steps: [checkout, run: sleep 60, run: test ! -f poc/fail-e2e] }
+  # The real e2e sleeps for the number of seconds in poc/e2e-sleep, or 60 when the file is missing.
+  run-e2e:
+    executor: base
+    steps:
+      - checkout
+      - run: 'n=$(cat poc/e2e-sleep 2>/dev/null || echo 60); echo "sleep $n"; sleep "$n"'
+      - run: test ! -f poc/fail-e2e
   skip:       { executor: base, steps: [run: circleci-agent step halt] }
 workflows:
   pr:
